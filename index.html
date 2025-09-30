@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador Léxico</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="main-header">
+        <h1>Diseño de Compiladores</h1>
+    </header>
+
+    <div class="main-container">
+        <nav class="side-menu">
+            <ul>
+                <li class="active">Analizador Léxico</li>
+                <li>Analizador Sintáctico</li>
+                <li>Gramática</li>
+            </ul>
+        </nav>
+
+        <main class="content-wrapper">
+            <div class="code-section">
+                <h2>Código Fuente</h2>
+                <textarea id="codigoFuente" placeholder="Ingresa tu código aquí..."></textarea>
+                <div class="button-row">
+                    <button id="btnAnalizar">Analizar</button>
+                    <button id="btnLimpiar">Limpiar</button>
+                </div>
+            </div>
+
+            <div class="tokens-section">
+                <h2>Tokens</h2>
+                <div class="table-container">
+                    <table id="tablaTokens">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th>Posición</th>
+                                <th>Fila</th>
+                                <th>Columna</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+                <div class="button-row">
+                    <button id="btnImportar">Importar</button>
+                    <button id="btnExportar">Exportar</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="mensaje-estado">
+        </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
