@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="Resources/Icons/icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="Resources/Css/styles.css">
     <title>Analizador Léxico</title>
-    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header class="main-header">
@@ -15,8 +16,7 @@
         <nav class="side-menu">
             <ul>
                 <li class="active">Analizador Léxico</li>
-                <li>Analizador Sintáctico</li>
-                <li>Gramática</li>
+                <li><a href="gramatica.html">Gramática</a></li>
             </ul>
         </nav>
 
@@ -28,6 +28,7 @@
                     <button id="btnAnalizar">Analizar</button>
                     <button id="btnLimpiar">Limpiar</button>
                 </div>
+                <p id="mensaje-estado"></p>
             </div>
 
             <div class="tokens-section">
@@ -47,17 +48,23 @@
                             </tbody>
                     </table>
                 </div>
-                <div class="button-row">
-                    <button id="btnImportar">Importar</button>
-                    <button id="btnExportar">Exportar</button>
+                <div class="filtro-tokens">
+                    <p>Filtrar Tokens:</p>
+                    <button id="btnMostrarTodos">Mostrar Todos</button>
+                    <button id="btnSoloDesconocidos">Desconocidos</button>
                 </div>
+                <div class="button-actions">
+                        <button id="btnImportar">Importar</button>
+                        <button id="btnExportarTXT">Exportar TXT</button>
+                        <button id="btnExportarCSV">Exportar CSV</button>
+                </div>
+                
             </div>
         </main>
+        
     </div>
+    
 
-    <div id="mensaje-estado">
-        </div>
-
-    <script src="script.js"></script>
+<script src="../Lexico/main.js" type="module"></script>
 </body>
 </html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="Resources/Icons/icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="Resources/Css/styles.css">
+    <link rel="stylesheet" href="Resources/Css/stylesGramatica.css">
+    <title>Gramática</title>
+</head>
+<body>
+    <header class="main-header">
+        <h1>Diseño de Compiladores</h1>
+    </header>
+
+    <div class="main-container">
+        <nav class="side-menu">
+            <ul>
+                <li><a href="index.html">Analizador Léxico</a></li>
+                <li class="active">Gramática</li>
+            </ul>
+        </nav>
+
+        <main class="content-wrapper">
+            <h2>Gramática del Analizador</h2>
+
+            <div class="gramatica-section">
+                <div class="gramatica-card-tipos">
+                    <h3>Tipos</h3>
+                    <ul>
+                        <li>ID: Identificador</li>
+                        <li>NUM: Número</li>
+                        <li>STRING: Cadena</li>
+                        <li>COMENTARIO: Comentario</li>
+                        <li>DESCONOCIDO: Caracteres no válidos</li>
+                    </ul>
+                </div>
+
+                <div class="gramatica-card">
+                    <h3>Operadores</h3>
+                    <ul>
+                        <li>+</li>
+                        <li>-</li>
+                        <li>*</li>
+                        <li>/</li>
+                        <li>%</li>
+                        <li>&lt;</li>
+                        <li>&gt;</li>
+                        <li>&lt; =</li>
+                        <li>&gt; =</li>
+                        <li>=</li>
+                        <li>= =</li>
+                        <li>!</li>
+                        <li>!=</li>
+                        <li>||</li>
+                        <li>&&</li>
+                        
+                    </ul>
+                </div>
+
+                <div class="gramatica-card">
+                    <h3>Delimitadores</h3>
+                    <ul>
+                        <li>(</li>
+                        <li>)</li>
+                        <li>{</li>
+                        <li>}</li>
+                        <li>[</li>
+                        <li>]</li>
+                        <li>;</li>
+                        <li>,</li>
+                        <li>.</li>
+                        <li>:</li>
+                    </ul>
+                </div>
+
+                <div class="gramatica-card">
+                    <h3>KeyWords</h3>
+                    <ul>
+                        <li>class</li>
+                        <li>public</li>
+                        <li>true</li>
+                        <li>false</li>
+                        <li>private</li>
+                        <li>static</li>
+                        <li>void</li>
+                        <li>if</li>
+                        <li>else</li>
+                        <li>while</li>
+                        <li>int</li>
+                        <li>return</li>
+                        <li>bool</li>
+
+                    </ul>
+                </div>
+
+                <div class="gramatica-card-regex">
+                    <h3>REGEX</h3>
+                    <ul>
+                        <li>ID: <code>/^[a-zA-Z][a-zA-Z0-9]*$/</code></li>
+                        <li>NUM: <code>/^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/</code></li>
+                        <li>STRING: <code>/^"([^"]*)"$/</code></li>
+                        <li>COMENTARIO: <code>/^\/\/.*?\/\/$/</code></li>
+                    </ul>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</body>
+</html>

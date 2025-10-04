@@ -1,0 +1,31 @@
+
+.gramatica-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.gramatica-card, .gramatica-card-tipos, .gramatica-card-regex {
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    padding: 15px;
+    flex: 1 1 300px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+
+.gramatica-card-tipos ul , .gramatica-card-regex ul {
+    padding-left: 20px;
+}
+
+/*Ordenar en 2 columnas*/
+.gramatica-card ul {
+    column-count: 2;
+    padding-left: 20px;
+}
+
+
+h2, h3{
+    color: var(--azul-primario);
+}
