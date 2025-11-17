@@ -6,7 +6,8 @@ export const TIPOS= {
     NUM: "Numero",
     STRING: "Cadena",
     COMENTARIO: "Comentario",   
-    DESCONOCIDO: "Desconocido"
+    DESCONOCIDO: "Desconocido",
+    EOF: "EOF"
 };
 
 export const OPERADORES = {
