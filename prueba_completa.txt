@@ -1,0 +1,91 @@
+// Este archivo valida todas las reglas del Analizador Sintactico
+
+class Calculadora {
+    // 1. Validacion de Campos (FieldDecl)
+    // Prueba: AccessOpt (public/private), Type (int/bool), ID y ArrOpt (arrays)
+    public int resultado;
+    private bool encendido;
+    int[] historial; 
+
+    // 2. Validacion de Metodos (MethodDecl)
+    // Prueba: StaticOpt, RetType (void), ParamListOpt (vacio) y Block
+    public static void main() {
+        // 3. Sentencias Locales (Stmt -> VarDecl)
+        // Prueba: Declaracion simple y con inicializacion (VarDeclTail)
+        int a;
+        int b = 10;
+        bool check = true;
+
+        // 4. Expresiones y Precedencia (Expr)
+        // Prueba: Jerarquia aritmetica (multiplicacion antes que suma)
+        a = 5 + 5 * 2; 
+
+        // 5. Estructuras de Control (IfStmt)
+        // Prueba: Operadores relacionales (>) y bloques anidados
+        if (a > b) {
+            a = a - 1;
+        } else {
+            a = a + 1;
+        }
+
+        // 6. Bucles (WhileStmt)
+        // Prueba: Operadores de igualdad (==)
+        while (check == true) {
+            // 7. Sintaxis Avanzada (Postfix)
+            // Prueba: Acceso a arreglos ([]) y asignacion
+            historial[0] = a;
+            check = false;
+        }
+
+        // 8. Retorno (ReturnStmt)
+        return;
+    }
+
+    // 9. Parametros y Retorno con Valor
+    // Prueba: ParamList (multiples argumentos) y retorno de expresion
+    int sumar(int x, int y) {
+        return x + y;
+    }
+}
+
+// 10. Clases Multiples y Recursividad
+// Prueba: ClassList y definicion de clases vacias
+class Utilerias {
+}
+
+
+1. Estructura General (Program y ClassList)
+
+Código: class Calculadora { ... } class Utilerias { }
+
+Validación: Comprueba que el parser puede leer múltiples clases secuencialmente y detenerse correctamente al llegar al final del archivo (EOF).
+
+2. Miembros de Clase (Member, FieldDecl, MethodDecl)
+
+Código: public int resultado; vs public static void main()
+
+Validación: Pone a prueba la lógica de lookahead de tu parser. El analizador debe leer los modificadores (public) y el tipo (int o void) y decidir si lo que sigue es una variable (termina en ;) o un método (tiene ( y {).
+
+3. Tipos de Datos y Arreglos (Type, ArrOpt)
+
+Código: int[] historial; y bool check
+
+Validación: Confirma que se aceptan los tipos primitivos definidos en Gramatica.js (int, bool) y la sintaxis de corchetes para arreglos.
+
+4. Precedencia Matemática (Expr, Term, Factor)
+
+Código: a = 5 + 5 * 2;
+
+Validación: Esta es la prueba más crítica para la lógica matemática. Tu parser, al ser descendente recursivo, debe interpretar esto como 5 + (5 * 2) (resultado 15) y no como (5 + 5) * 2 (resultado 20), respetando la jerarquía de operaciones definida en tus funciones add() y mul().
+
+5. Estructuras de Control (Stmt)
+
+Código: if (a > b) { ... } else { ... } y while (...)
+
+Validación: Verifica que las palabras clave if, else, while exijan paréntesis obligatorios (...) y un bloque de código o sentencia posterior.
+
+6. Uso de Identificadores y Asignación (Assign, Postfix)
+
+Código: historial[0] = a;
+
+Validación: Prueba la regla Postfix que permite accesos complejos como arreglos ([...]) antes de una asignación. Esto confirma que el parser maneja correctamente el "L-Value" (el lado izquierdo de una asignación).
