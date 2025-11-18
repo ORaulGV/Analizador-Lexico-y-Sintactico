@@ -1,649 +1,498 @@
-import { TIPOS } from "./Gramatica.js";
+import { TIPOS } from "../Gramatica.js";
 
-/**
- * Clase especial para Errores Sintácticos, incluye el token
- * donde ocurrió el error para reportarlo mejor.
- */
-class ErrorSintactico extends Error {
-    constructor(mensaje, token) {
-        // Llama al constructor de la clase base (Error)
-        super(mensaje);
-        // Propiedades personalizadas
-        this.token = token;
-        this.name = "ErrorSintactico";
+class ASTNode {
+    constructor(type, value = null, children = []) {
+        this.type = type;
+        this.value = value;
+        this.children = children;
     }
 }
 
-/**
- * Implementa un Analizador de Descenso Recursivo
- * basado en la gramática LL(1) proporcionada.
- */
 export class Parser {
     constructor(tokens) {
-        // Filtramos comentarios. El parser no los necesita.
-        this.tokens = tokens.filter(t => t.tipo !== TIPOS.COMENTARIO);
-        this.posicion = 0;
+        this.tokens = tokens;
+        this.pos = 0;
+        this.current = this.tokens[this.pos];
+        this.skipIgnoredTokens(); // 1. SALTA COMENTARIOS AL INICIAR
     }
 
-    /**
-     * Inicia el análisis.
-     * Es el punto de entrada (basado en el No-Terminal 'Program')
-     */
-    parse() {
-        try {
-            this.program();
-            // Si llega aquí, todo salió bien
-            return "Análisis Sintáctico Completado Exitosamente";
-            
-        } catch (error) {
-            if (error instanceof ErrorSintactico) {
-                // Relanzamos un error más claro para main.js
-                const t = error.token;
-                throw new Error(`[Fila ${t.fila}, Col ${t.columna}]: ${error.message} (Token: '${t.valor}', Tipo: ${t.tipo})`);
-            }
-            throw error; // Errores inesperados
+    // ---------------------
+    // Nueva Utilidad
+    // ---------------------
+    skipIgnoredTokens() {
+        // Asegura que this.current siempre apunte al siguiente token relevante
+        while (this.current && this.current.tipo === TIPOS.COMENTARIO) {
+            this.pos++;
+            this.current = this.tokens[this.pos];
         }
     }
 
-    // --- MÉTODOS DE AYUDA (Helpers) ---
-
-    /** Devuelve el token actual sin consumirlo */
-    peek() {
-        return this.tokens[this.posicion];
-    }
-
-    /** Devuelve true si estamos en el último token (EOF) */
-    isAtEnd() {
-        return this.peek().tipo === TIPOS.EOF;
-    }
-
-    /** Consume el token actual y avanza la posición */
-    advance() {
-        if (!this.isAtEnd()) this.posicion++;
-        return this.previous();
-    }
-
-    /** Devuelve el token anterior (recién consumido) */
-    previous() {
-        return this.tokens[this.posicion - 1];
-    }
-
-    /** Comprueba si el token actual es del tipo esperado */
-    check(tipo) {
-        if (this.isAtEnd()) return false;
-        return this.peek().tipo === tipo;
-    }
-
-    /**
-     * Comprueba si el token actual coincide con alguno de los tipos.
-     * Si coincide, consume el token y devuelve 'true'.
-     * Si no, devuelve 'false'.
-     */
-    match(...tipos) {
-        for (const tipo of tipos) {
-            if (this.check(tipo)) {
-                this.advance();
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    /**
-     * Comprueba si el token actual es un Keyword específico.
-     * Si lo es, lo consume y devuelve 'true'.
-     */
-    matchKeyword(valor) {
-        if (this.check(TIPOS.KEYWORD) && this.peek().valor === valor) {
-            this.advance();
-            return true;
-        }
-        return false;
-    }
-    
-    /**
-     * Comprueba si el token actual es un Delimitador específico.
-     * Si lo es, lo consume y devuelve 'true'.
-     */
-    matchDelimitador(valor) {
-         if (this.check(TIPOS.DELIMITADOR) && this.peek().valor === valor) {
-            this.advance();
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Comprueba si el token actual es un Operador específico.
-     * Si lo es, lo consume y devuelve 'true'.
-     */
-    matchOperador(valor) {
-        if (this.check(TIPOS.OPERADOR) && this.peek().valor === valor) {
-           this.advance();
-           return true;
-       }
-       return false;
-   }
-
-    /**
-     * Consume el token actual SI es del tipo esperado.
-     * Si no, lanza un error sintáctico.
-     */
-    consume(tipo, mensajeError) {
-        if (this.check(tipo)) return this.advance();
-        throw this.error(this.peek(), mensajeError);
-    }
-    
-    /**
-     * Consume el token actual SI es un Delimitador específico.
-     * Si no, lanza un error sintáctico.
-     */
-    consumeDelimitador(valor, mensajeError) {
-        if (this.check(TIPOS.DELIMITADOR) && this.peek().valor === valor) {
-            return this.advance();
-        }
-        throw this.error(this.peek(), mensajeError);
-    }
-
-    /** Genera un nuevo error sintáctico */
-    error(token, mensaje) {
-        return new ErrorSintactico(mensaje, token);
-    }
-
-    // --- REGLAS DE LA GRAMÁTICA (BASADAS EN LAS IMÁGENES) ---
-    // Cada función corresponde a un No-Terminal
-
-    // Program -> ClassList EOF
-    program() {
-        this.classList();
-        this.consume(TIPOS.EOF, "Se esperaba el fin del archivo.");
-    }
-
-    // ClassList -> ClassDecl ClassList | ε
-    classList() {
-        // Si no empieza con 'class', es la regla épsilon (lista vacía)
-        if (!this.matchKeyword('class')) {
-            return; // Regla épsilon
+    // ---------------------
+    // Utilidades básicas
+    // ---------------------
+    lookAhead(offset = 1) {
+        // NOTA: lookAhead NO debe saltar tokens, solo mirar.
+        if (this.pos + offset >= this.tokens.length) {
+            return this.tokens[this.tokens.length - 1]; 
         }
         
-        // Si vemos 'class', consumimos la declaración y llamamos recursivamente
-        this.posicion--; // Retrocedemos para que classDecl consuma 'class'
-        this.classDecl();
-        this.classList(); // Recursión
+        // El lookAhead actual no salta comentarios, lo cual es generalmente aceptable, 
+        // ya que los comentarios deberían ser filtrados por skipIgnoredTokens.
+        return this.tokens[this.pos + offset];
     }
 
-    // ClassDecl -> class ID '{' MemberList '}'
-    classDecl() {
-        this.consume(TIPOS.KEYWORD, "Se esperaba 'class'."); // consume 'class'
-        this.consume(TIPOS.ID, "Se esperaba un nombre (ID) para la clase.");
-        this.consumeDelimitador('{', "Se esperaba '{' para iniciar el cuerpo de la clase.");
-        this.memberList();
-        this.consumeDelimitador('}', "Se esperaba '}' para cerrar el cuerpo de la clase.");
-    }
-
-    // MemberList -> Member MemberList | ε
-    memberList() {
-        // Si el token actual es '}', significa que MemberList es épsilon
-        if (this.peek().valor === '}') {
-            return; // Regla épsilon
+    match(tipo, valor = null) {
+        if (this.current.tipo === tipo && (valor === null || this.current.valor === valor)) {
+            const matchedToken = this.current;
+            this.pos++;
+            this.current = this.tokens[this.pos];
+            this.skipIgnoredTokens(); // 2. SALTA COMENTARIOS DESPUÉS DE MATCH
+            return matchedToken;
         }
 
-        // Si no, consumimos un 'Member' y llamamos recursivamente
-        this.member();
-        this.memberList();
+        throw new Error(`[Fila ${this.current.fila}, Col ${this.current.columna}]: Se esperaba '${valor ?? tipo}' y se encontró '${this.current.valor}'`);
     }
 
-    // Member -> FieldDecl | MethodDecl
-    member() {
-        // --- LÓGICA DE LOOKAHEAD (Vistazo) ---
-        // Necesitamos distinguir entre FieldDecl y MethodDecl
-        // FieldDecl:  AccessOpt Type ID ArrOpt ';'
-        // MethodDecl: AccessOpt StaticOpt RetType ID '(' ...
-        
-        // Guardamos la posición actual para poder "rebobinar"
-        const snapshot = this.posicion;
-
-        // Simulamos el parseo de las partes comunes/distintivas
-        this.accessOpt();
-        this.staticOpt();
-        
-        // RetType cubre Type (int, bool, ID) y 'void'
-        this.retType(); 
-
-        // Si lo que sigue no es un ID, es un error
-        if (!this.check(TIPOS.ID)) {
-             // Restauramos y lanzamos un error claro
-             this.posicion = snapshot;
-             throw this.error(this.peek(), "Se esperaba una declaración de campo (Field) o método (Method).");
-        }
-        this.advance(); // Consumimos el ID
-
-        // ¡LA CLAVE! ¿Qué viene después del ID?
-        const esMetodo = this.matchDelimitador('(');
-
-        // Rebobinamos el parser a la posición inicial
-        this.posicion = snapshot;
-
-        // Ahora sí, llamamos a la regla correcta
-        if (esMetodo) {
-            this.methodDecl();
-        } else {
-            this.fieldDecl();
-        }
-    }
-
-    // AccessOpt -> public | private | ε
-    accessOpt() {
-        if (this.matchKeyword('public') || this.matchKeyword('private')) {
-            return; // Se consumió
-        }
-        // Si no, es épsilon (ε), no hacemos nada
-    }
-    
-    // FieldDecl -> AccessOpt Type ID ArrOpt ';'
-    fieldDecl() {
-        this.accessOpt();
-        this.type();
-        this.consume(TIPOS.ID, "Se esperaba un ID para el campo.");
-        this.arrOpt();
-        this.consumeDelimitador(';', "Se esperaba ';' al final de la declaración de campo.");
-    }
-    
-    // MethodDecl -> AccessOpt StaticOpt RetType ID '(' ParamListOpt ')' Block
-    methodDecl() {
-        this.accessOpt();
-        this.staticOpt();
-        this.retType();
-        this.consume(TIPOS.ID, "Se esperaba un ID para el método.");
-        this.consumeDelimitador('(', "Se esperaba '(' para la lista de parámetros.");
-        this.paramListOpt();
-        this.consumeDelimitador(')', "Se esperaba ')' para cerrar la lista de parámetros.");
-        this.block();
-    }
-
-    // StaticOpt -> static | ε
-    staticOpt() {
-        if (this.matchKeyword('static')) {
-            return; // Se consumió
-        }
-        // Si no, épsilon
-    }
-
-    // RetType -> Type | void
-    retType() {
-        if (this.matchKeyword('void')) {
-            return; // Se consumió 'void'
-        }
-        this.type(); // Intenta parsear 'Type'
-    }
-
-    // ParamListOpt -> ParamList | ε
-    paramListOpt() {
-        // Si el siguiente token es ')', ParamList es épsilon
-        if (this.peek().valor === ')') {
-            return; // Regla épsilon
-        }
-        this.paramList();
-    }
-
-    // ParamList -> Param ParamListTail
-    paramList() {
-        this.param();
-        this.paramListTail();
-    }
-
-    // ParamListTail -> ',' Param ParamListTail | ε
-    paramListTail() {
-        if (this.matchDelimitador(',')) {
-            this.param();
-            this.paramListTail();
-        }
-        // Si no, épsilon
-    }
-
-    // Param -> Type ID ArrOpt
-    param() {
-        this.type();
-        this.consume(TIPOS.ID, "Se esperaba un ID para el parámetro.");
-        this.arrOpt();
-    }
-
-    // Type -> int | bool | ID
-    type() {
-        if (this.matchKeyword('int') || this.matchKeyword('bool')) {
-            return; // Se consumió tipo primitivo
-        } else if (this.match(TIPOS.ID)) {
-            return; // Se consumió tipo ID (ej. otra clase)
-        }
-        
-        // Si no es ninguno, es un error
-        throw this.error(this.peek(), "Se esperaba un tipo (int, bool, o ID).");
-    }
-
-    // ArrOpt -> '[' ']' ArrOpt | ε
-    arrOpt() {
-        if (this.matchDelimitador('[')) {
-            this.consumeDelimitador(']', "Se esperaba ']' después de '[' en la declaración de arreglo.");
-            this.arrOpt(); // Recursión para arreglos multidimensionales (ej. int[][])
-        }
-        // Si no, épsilon
-    }
-
-    // Block -> '{' StmtList '}'
-    block() {
-        this.consumeDelimitador('{', "Se esperaba '{' para iniciar un bloque.");
-        this.stmtList();
-        this.consumeDelimitador('}', "Se esperaba '}' para cerrar un bloque.");
-    }
-
-    // StmtList -> Stmt StmtList | ε
-    stmtList() {
-        // Si el siguiente token es '}', StmtList es épsilon
-        if (this.peek().valor === '}') {
-            return; // Regla épsilon
-        }
-        this.stmt();
-        this.stmtList();
-    }
-
-    // Stmt -> Block | VarDecl | ExprStmt | IfStmt | WhileStmt | ReturnStmt
-    stmt() {
-        // Usamos el primer token para decidir qué regla seguir
-        if (this.peek().valor === '{') {
-            this.block();
-        }
-        else if (this.matchKeyword('if')) {
-            this.posicion--; // Rebobinar para que ifStmt consuma 'if'
-            this.ifStmt();
-        }
-        else if (this.matchKeyword('while')) {
-            this.posicion--; // Rebobinar
-            this.whileStmt();
-        }
-        else if (this.matchKeyword('return')) {
-            this.posicion--; // Rebobinar
-            this.returnStmt();
-        }
-        // Ambigüedad: VarDecl y ExprStmt pueden empezar con ID, int, bool.
-        else if (this.check(TIPOS.KEYWORD) && (this.peek().valor === 'int' || this.peek().valor === 'bool')) {
-            // Empieza con 'int' o 'bool', es VarDecl
-            this.varDecl();
-        }
-        else if (this.check(TIPOS.ID)) {
-            // --- LÓGICA DE LOOKAHEAD (Vistazo) ---
-            // Puede ser VarDecl (ej. 'MiClase miVar;') o ExprStmt (ej. 'miVar = 5;')
-            const snapshot = this.posicion;
-            this.type(); // Consume 'ID' (como tipo)
-            this.arrOpt();
-            
-            // Si después de 'Type' y 'ArrOpt' viene un 'ID', es VarDecl
-            const esVarDecl = this.check(TIPOS.ID);
-            
-            this.posicion = snapshot; // Rebobinar
-
-            if (esVarDecl) {
-                this.varDecl();
-            } else {
-                this.exprStmt();
-            }
-        }
-        // Si no es ninguno de los anteriores, debe ser una Expresión
-        else {
-            this.exprStmt();
-        }
-    }
-    
-    // VarDecl -> Type ID ArrOpt VarDeclTail
-    varDecl() {
-        this.type();
-        this.consume(TIPOS.ID, "Se esperaba un ID para la variable.");
-        this.arrOpt();
-        this.varDeclTail();
-    }
-
-    // VarDeclTail -> '=' Expr ';' | ';'
-    varDeclTail() {
-        if (this.matchOperador('=')) {
-            this.expr();
-            this.consumeDelimitador(';', "Se esperaba ';' después de la inicialización de la variable.");
-        } else {
-            this.consumeDelimitador(';', "Se esperaba ';' al final de la declaración de variable.");
-        }
-    }
-
-    // IfStmt -> if '(' Expr ')' Stmt ElseOpt
-    ifStmt() {
-        this.consume(TIPOS.KEYWORD, "Se esperaba 'if'.");
-        this.consumeDelimitador('(', "Se esperaba '('.");
-        this.expr();
-        this.consumeDelimitador(')', "Se esperaba ')'.");
-        this.stmt();
-        this.elseOpt();
-    }
-
-    // ElseOpt -> else Stmt | ε
-    elseOpt() {
-        if (this.matchKeyword('else')) {
-            this.stmt();
-        }
-        // Si no, épsilon
-    }
-
-    // WhileStmt -> while '(' Expr ')' Stmt
-    whileStmt() {
-        this.consume(TIPOS.KEYWORD, "Se esperaba 'while'.");
-        this.consumeDelimitador('(', "Se esperaba '('.");
-        this.expr();
-        this.consumeDelimitador(')', "Se esperaba ')'.");
-        this.stmt();
-    }
-
-    // ReturnStmt -> return Expr ';' | return ';'
-    returnStmt() {
-        this.consume(TIPOS.KEYWORD, "Se esperaba 'return'.");
-        // Si lo que sigue no es ';', debe ser una Expr
-        if (!this.check(TIPOS.DELIMITADOR) || this.peek().valor !== ';') {
-            this.expr();
-        }
-        this.consumeDelimitador(';', "Se esperaba ';' al final del 'return'.");
-    }
-
-    // ExprStmt -> Expr ';' | ';'
-    exprStmt() {
-        // Si no es un ';', debe ser una Expr
-        if (!this.check(TIPOS.DELIMITADOR) || this.peek().valor !== ';') {
-            this.expr();
-        }
-        this.consumeDelimitador(';', "Se esperaba ';' al final de la expresión.");
-    }
-
-    // --- PARSER DE EXPRESIONES (Descenso Recursivo) ---
-    // Sigue la precedencia de operadores
-
-    // Expr -> Assign
-    expr() {
-        this.assign();
-    }
-    
-    // Assign -> Or AssignTail
-    assign() {
-        this.or(); // Lado izquierdo
-        this.assignTail(); // Lado derecho (recursivo)
-    }
-
-    // AssignTail -> '=' Assign | ε
-    assignTail() {
-        if (this.matchOperador('=')) {
-            this.assign(); // Asignación es asociativa por la derecha
-        }
-        // Si no, épsilon
-    }
-
-    // Or -> And OrTail
-    or() {
-        this.and();
-        this.orTail();
-    }
-
-    // OrTail -> '||' And OrTail | ε
-    orTail() {
-        if (this.matchOperador('||')) {
-            this.and();
-            this.orTail(); // Asociatividad por la izquierda (con recursión de cola)
-        }
-        // Si no, épsilon
-    }
-
-    // And -> Eq AndTail
-    and() {
-        this.eq();
-        this.andTail();
-    }
-
-    // AndTail -> '&&' Eq AndTail | ε
-    andTail() {
-        if (this.matchOperador('&&')) {
-            this.eq();
-            this.andTail();
-        }
-        // Si no, épsilon
-    }
-
-    // Eq -> Rel EqTail
-    eq() {
-        this.rel();
-        this.eqTail();
-    }
-
-    // EqTail -> '==' Rel EqTail | '!=' Rel EqTail | ε
-    eqTail() {
-        if (this.matchOperador('==') || this.matchOperador('!=')) {
-            this.rel();
-            this.eqTail();
-        }
-        // Si no, épsilon
-    }
-
-    // Rel -> Add RelTail
-    rel() {
-        this.add();
-        this.relTail();
-    }
-
-    // RelTail -> '<' Add RelTail | '<=' Add RelTail | '>' Add RelTail | '>=' Add RelTail | ε
-    relTail() {
-        if (
-            this.matchOperador('<') || this.matchOperador('<=') ||
-            this.matchOperador('>') || this.matchOperador('>=')
-        ) {
-            this.add();
-            this.relTail();
-        }
-        // Si no, épsilon
-    }
-
-    // Add -> Mul AddTail
-    add() {
-        this.mul();
-        this.addTail();
-    }
-
-    // AddTail -> '+' Mul AddTail | '-' Mul AddTail | ε
-    addTail() {
-        if (this.matchOperador('+') || this.matchOperador('-')) {
-            this.mul();
-            this.addTail();
-        }
-        // Si no, épsilon
-    }
-    
-    // Mul -> Unary MulTail
-    mul() {
-        this.unary();
-        this.mulTail();
-    }
-
-    // MulTail -> '*' Unary MulTail | '/' Unary MulTail | '%' Unary MulTail | ε
-    mulTail() {
-        if (this.matchOperador('*') || this.matchOperador('/') || this.matchOperador('%')) {
-            this.unary();
-            this.mulTail();
-        }
-        // Si no, épsilon
-    }
-
-    // Unary -> '!' Unary | '-' Unary | Postfix
-    unary() {
-        if (this.matchOperador('!') || this.matchOperador('-')) {
-            this.unary(); // Recursión para unarios (ej. !!true, --5)
-        } else {
-            this.postfix();
-        }
-    }
-
-    // Postfix -> Primary PostfixTail
-    postfix() {
-        this.primary();
-        this.postfixTail();
-    }
-
-    // PostfixTail -> '(' ArgListOpt ')' PostfixTail | '[' Expr ']' PostfixTail | '.' ID PostfixTail | ε
-    postfixTail() {
-        if (this.matchDelimitador('(')) {
-            this.argListOpt();
-            this.consumeDelimitador(')', "Se esperaba ')' para cerrar la lista de argumentos.");
-            this.postfixTail(); // Permite llamadas encadenadas ej. foo(1)(2)
-        }
-        else if (this.matchDelimitador('[')) {
-            this.expr();
-            this.consumeDelimitador(']', "Se esperaba ']' para cerrar el acceso al arreglo.");
-            this.postfixTail(); // Permite ej. arr[1][2]
-        }
-        else if (this.matchDelimitador('.')) {
-            this.consume(TIPOS.ID, "Se esperaba un ID (nombre de campo o método) después de '.'.");
-            this.postfixTail(); // Permite ej. obj.campo.metodo()
-        }
-        // Si no, épsilon
-    }
-
-    // Primary -> ID | NUM | STRING | true | false | '(' Expr ')'
-    primary() {
-        if (this.match(TIPOS.ID)) return;
-        if (this.match(TIPOS.NUM)) return;
-        if (this.match(TIPOS.STRING)) return;
-        if (this.matchKeyword('true')) return;
-        if (this.matchKeyword('false')) return;
-
-        if (this.matchDelimitador('(')) {
-            this.expr();
-            this.consumeDelimitador(')', "Se esperaba ')' después de la expresión entre paréntesis.");
+    matchOperator(op) {
+        if (this.current.tipo === TIPOS.OPERADOR && this.current.valor === op) {
+            this.pos++;
+            this.current = this.tokens[this.pos];
+            this.skipIgnoredTokens(); // 3. SALTA COMENTARIOS DESPUÉS DE MATCH OPERATOR
             return;
         }
-
-        throw this.error(this.peek(), "Se esperaba un valor primario (ID, número, cadena, true, false, o '(').");
+        throw new Error(`[Fila ${this.current.fila}, Col ${this.current.columna}]: Se esperaba operador '${op}'`);
     }
 
-    // ArgListOpt -> ArgList | ε
-    argListOpt() {
-        // Si el siguiente token es ')', ArgList es épsilon
-        if (this.peek().valor === ')') {
-            return; // Regla épsilon
+    // ---------------------
+    // REGLA PRINCIPAL
+    // ---------------------
+    parse() {
+        const classes = [];
+        // Program -> ClassList (ClassList -> ClassDecl ClassList | ε)
+        while (this.current.tipo !== TIPOS.EOF) {
+            classes.push(this.classDecl());
         }
-        this.argList();
+
+        return new ASTNode("Program", null, classes);
     }
 
-    // ArgList -> Expr ArgListTail
-    argList() {
-        this.expr();
-        this.argListTail();
+    // ---------------------
+    // DECLARACIONES (cuerpo se mantiene sin cambios)
+    // ---------------------
+
+    classDecl() {
+        this.match(TIPOS.KEYWORD, "class");
+        const name = this.current.valor;
+        this.match(TIPOS.ID);
+
+        this.match(TIPOS.DELIMITADOR, "{");
+
+        const body = this.classBody();
+
+        this.match(TIPOS.DELIMITADOR, "}");
+
+        return new ASTNode("ClassDecl", name, body);
     }
 
-    // ArgListTail -> ',' Expr ArgListTail | ε
-    argListTail() {
-        if (this.matchDelimitador(',')) {
-            this.expr();
-            this.argListTail();
+    classBody() {
+        const members = [];
+
+        // MemberList -> Member MemberList | ε
+        while (!(this.current.tipo === TIPOS.DELIMITADOR && this.current.valor === "}")) {
+            members.push(this.member());
         }
-        // Si no, épsilon
+
+        return members;
+    }
+
+    // En sintactico.js, dentro de la clase Parser:
+
+    member() {
+        // Member -> Type ID ArrOpt? | Type ID (ParamList) Block
+        const modifiers = [];
+
+            while (
+                this.current.tipo === TIPOS.KEYWORD &&
+                ["public", "private", "static"].includes(this.current.valor)
+            ) {
+                modifiers.push(this.current.valor);
+                this.match(TIPOS.KEYWORD); 
+        }
+        const type = this.type();
+        
+        // Si encontramos '[]' aquí, lo consumimos. Esto maneja la sintaxis 'Type[] ID'.
+        let isArray = false;
+        if (this.current.valor === "[" && this.lookAhead(1).valor === "]") {
+            this.match(TIPOS.DELIMITADOR, "[");
+            this.match(TIPOS.DELIMITADOR, "]");
+            isArray = true;
+        }
+
+        const name = this.current.valor;
+        this.match(TIPOS.ID); // Ahora sí, el siguiente debe ser el ID ('flags')
+
+        // Si es un método?
+        if (this.current.valor === "(") {
+            // NOTA: No se permiten métodos que devuelvan Type[] en esta implementación simple, pero lo dejamos así.
+            return this.methodDecl(type, name);
+        }
+
+        // Si es un arreglo FieldDecl -> Type ID ArrOpt ;
+        // Si el arreglo no se definió en el tipo (Type ID[]), se busca la sintaxis ArrOpt aquí.
+        if (this.current.valor === "[") {
+            this.match(TIPOS.DELIMITADOR, "[");
+            this.match(TIPOS.DELIMITADOR, "]");
+            isArray = true;
+        }
+        
+        // Si fue declarado como 'Type[] ID' (isArray=true) o 'Type ID[]' (pasó el segundo if), es un FieldDecl.
+        // Si es un método (retorna arriba), entonces este es un FieldDecl.
+
+        this.match(TIPOS.DELIMITADOR, ";");
+        
+        // Podrías registrar el tipo de campo como ArrayType o VarDecl[Array].
+        const nodeType = isArray ? "ArrayFieldDecl" : "FieldDecl";
+        return new ASTNode(nodeType, name, [type]);
+    }
+
+    methodDecl(type, name, modifiers = []) {
+        this.match(TIPOS.DELIMITADOR, "(");
+        const params = this.params();
+        this.match(TIPOS.DELIMITADOR, ")");
+
+        const block = this.block();
+
+        return new ASTNode("MethodDecl", name, [type, ...modifiers, ...params, block]);
+    }
+
+    params() {
+        const list = [];
+
+        // ParamList -> Param ParamListTail | ε
+        if (this.current.valor === ")") return list;
+
+        list.push(this.param());
+
+        // ParamListTail -> , Param ParamListTail | ε
+        while (this.current.valor === ",") {
+            this.match(TIPOS.DELIMITADOR, ",");
+            list.push(this.param());
+        }
+
+        return list;
+    }
+    
+    param() {
+        // Param -> Type ID ArrOpt
+        const t = this.type();
+        const id = this.current.valor;
+        this.match(TIPOS.ID);
+        
+        // ArrOpt -> [ ] | ε
+        if (this.current.valor === "[") {
+             this.match(TIPOS.DELIMITADOR, "[");
+             this.match(TIPOS.DELIMITADOR, "]");
+        }
+        
+        return new ASTNode("Param", id, [t]);
+    }
+
+    type() {
+        const t = this.current.valor;
+
+        if (["int", "bool", "void"].includes(t)) {
+            this.match(TIPOS.KEYWORD);
+            return new ASTNode("Type", t);
+        }
+
+        throw new Error(`[Fila ${this.current.fila}, Col ${this.current.columna}]: Tipo inválido '${t}'`);
+    }
+
+    // ---------------------
+    // BLOQUES Y SENTENCIAS (cuerpo se mantiene sin cambios)
+    // ---------------------
+    block() {
+        this.match(TIPOS.DELIMITADOR, "{");
+
+        const stmts = [];
+        // StmtList -> Stmt StmtList | ε
+        while (!(this.current.tipo === TIPOS.DELIMITADOR && this.current.valor === "}")) {
+            stmts.push(this.statement());
+        }
+
+        this.match(TIPOS.DELIMITADOR, "}");
+        return new ASTNode("Block", null, stmts);
+    }
+
+    statement() {
+        // Stmt -> Block
+        if (this.current.valor === "{") return this.block();
+
+        // Stmt -> if | while | return
+        if (this.current.valor === "if") return this.ifStmt();
+        if (this.current.valor === "while") return this.whileStmt();
+        if (this.current.valor === "return") return this.returnStmt();
+        
+        // Stmt -> ; (Sentencia vacía)
+        if (this.current.valor === ";") {
+             this.match(TIPOS.DELIMITADOR, ";");
+             return new ASTNode("EmptyStmt");
+        }
+
+        // Determinar si es una Declaración de variable local o una Expresión/Asignación
+        if (["int", "bool"].includes(this.current.valor)) {
+            // Stmt -> Type ID ArrOpt (= Expr)? ;
+            const t = this.type();
+            const name = this.current.valor;
+            this.match(TIPOS.ID);
+            
+            // ArrOpt (aunque en sentencias locales ArrOpt no tiene mucho sentido sin inicialización,
+            // lo dejamos para consistencia con FieldDecl si se permite)
+            if (this.current.valor === "[") {
+                this.match(TIPOS.DELIMITADOR, "[");
+                this.match(TIPOS.DELIMITADOR, "]");
+            }
+
+            let expr = null;
+            if (this.current.valor === "=") {
+                this.matchOperator("=");
+                expr = this.expr();
+            }
+
+            this.match(TIPOS.DELIMITADOR, ";");
+            return new ASTNode("VarDeclLocal", name, expr ? [t, expr] : [t]);
+        }
+
+        // Stmt -> Expr ; (Puede ser Asignación o Llamada a método)
+        const node = this.expr(); 
+        
+        // Si el resultado de la expresión es una Asignación o Llamada a Método (Expr;), consumimos el ';'
+        this.match(TIPOS.DELIMITADOR, ";");
+        return node;
+    }
+
+    assign(lvalue) {
+        // Lógica de asignación (revisada para manejar el LValue como nodo)
+        this.matchOperator("=");
+        const expr = this.expr();
+        return new ASTNode("Assign", null, [lvalue, expr]);
+    }
+
+    ifStmt() {
+        this.match(TIPOS.KEYWORD, "if");
+        this.match(TIPOS.DELIMITADOR, "(");
+        const cond = this.expr();
+        this.match(TIPOS.DELIMITADOR, ")");
+
+        const thenStmt = this.statement();
+        let elseStmt = null;
+
+        if (this.current.valor === "else") {
+            this.match(TIPOS.KEYWORD, "else");
+            elseStmt = this.statement();
+        }
+
+        return new ASTNode("If", null, [cond, thenStmt, elseStmt].filter(n => n !== null));
+    }
+
+    whileStmt() {
+        this.match(TIPOS.KEYWORD, "while");
+        this.match(TIPOS.DELIMITADOR, "(");
+        const cond = this.expr();
+        this.match(TIPOS.DELIMITADOR, ")");
+
+        const body = this.statement();
+
+        return new ASTNode("While", null, [cond, body]);
+    }
+
+    returnStmt() {
+        this.match(TIPOS.KEYWORD, "return");
+
+        let exp = null;
+        // ExprOpt -> Expr | ε
+        if (this.current.valor !== ";") {
+            exp = this.expr();
+        }
+
+        this.match(TIPOS.DELIMITADOR, ";");
+        return new ASTNode("Return", null, exp ? [exp] : []);
+    }
+
+    // ---------------------
+    // EXPRESIONES (cuerpo se mantiene sin cambios)
+    // ---------------------
+    expr() {
+        // Usaremos esta función para manejar las asignaciones de forma explícita 
+        // ya que el lado izquierdo de una asignación puede ser un Primary complejo (ej: arr[0])
+        const left = this.logicOr();
+
+        // Manejo de Asignación simple (solo si el Lado Izquierdo es un LValue válido)
+        if (this.current.valor === "=") {
+            if (left.type === "Identifier" || left.type === "ArrayAccess" || left.type === "MemberAccess") {
+                return this.assign(left);
+            }
+            throw new Error(`[Fila ${this.current.fila}, Col ${this.current.columna}]: Lado izquierdo de la asignación no es válido.`);
+        }
+        
+        return left;
+    }
+
+    // Lógica de precedencia (LogicoO/LogicoY/Equality/Relational/Add/Mul/Unary) - Sin cambios, ya es LL(1)
+    logicOr() {
+        let left = this.logicAnd();
+        while (this.current.valor === "||") {
+            this.matchOperator("||");
+            const right = this.logicAnd();
+            left = new ASTNode("Binary", "||", [left, right]);
+        }
+        return left;
+    }
+
+    logicAnd() {
+        let left = this.equality();
+        while (this.current.valor === "&&") {
+            this.matchOperator("&&");
+            const right = this.equality();
+            left = new ASTNode("Binary", "&&", [left, right]);
+        }
+        return left;
+    }
+
+    equality() {
+        let left = this.rel();
+        while (["==", "!="].includes(this.current.valor)) {
+            const op = this.current.valor;
+            this.match(TIPOS.OPERADOR);
+            const right = this.rel();
+            left = new ASTNode("Binary", op, [left, right]);
+        }
+        return left;
+    }
+
+    rel() {
+        let left = this.add();
+        while (["<", ">", "<=", ">="].includes(this.current.valor)) {
+            const op = this.current.valor;
+            this.match(TIPOS.OPERADOR);
+            const right = this.add();
+            left = new ASTNode("Binary", op, [left, right]);
+        }
+        return left;
+    }
+
+    add() {
+        let left = this.mul();
+        while (["+", "-"].includes(this.current.valor)) {
+            const op = this.current.valor;
+            this.match(TIPOS.OPERADOR);
+            const right = this.mul();
+            left = new ASTNode("Binary", op, [left, right]);
+        }
+        return left;
+    }
+
+    mul() {
+        let left = this.unary();
+        while (["*", "/", "%"].includes(this.current.valor)) {
+            const op = this.current.valor;
+            this.match(TIPOS.OPERADOR);
+            const right = this.unary();
+            left = new ASTNode("Binary", op, [left, right]);
+        }
+        return left;
+    }
+
+    unary() {
+        if (["!", "-"].includes(this.current.valor)) {
+            const op = this.current.valor;
+            this.match(TIPOS.OPERADOR);
+            const expr = this.unary();
+            return new ASTNode("Unary", op, [expr]);
+        }
+        return this.primary();
+    }
+
+    primary() {
+        const token = this.current;
+        let node;
+
+        // Literales
+        if (token.tipo === TIPOS.NUM) {
+            this.match(TIPOS.NUM);
+            node = new ASTNode("Number", token.valor);
+        } else if (token.tipo === TIPOS.STRING) {
+            this.match(TIPOS.STRING);
+            node = new ASTNode("String", token.valor);
+        } else if (token.tipo === TIPOS.KEYWORD && ["true", "false"].includes(token.valor)) {
+            this.match(TIPOS.KEYWORD);
+            node = new ASTNode("Boolean", token.valor);
+        } else if (token.valor === "(") {
+            this.match(TIPOS.DELIMITADOR, "(");
+            node = this.expr();
+            this.match(TIPOS.DELIMITADOR, ")");
+        } else if (token.tipo === TIPOS.ID) {
+            // Primario -> ID CallOpt AccessExprTail
+            node = new ASTNode("Identifier", token.valor);
+            this.match(TIPOS.ID);
+            
+            // CallOpt -> ( Args ) | ε
+            if (this.current.valor === "(") {
+                node = this.call(node); 
+            }
+            
+            // AccessExprTail -> . ID AccessExprTail | [ Expr ] AccessExprTail | ε
+            node = this.accessExprTail(node);
+            
+        } else {
+            throw new Error(`[Fila ${token.fila}, Col ${token.columna}]: Expresión primaria no válida '${token.valor}'`);
+        }
+        
+        return node;
+    }
+    
+    // CallOpt -> ( Args ) | ε
+    call(calleeNode) {
+        this.match(TIPOS.DELIMITADOR, "(");
+        const args = this.args(); 
+        this.match(TIPOS.DELIMITADOR, ")");
+        return new ASTNode("Call", null, [calleeNode, ...args]);
+    }
+    
+    // Args -> Expr ArgListTail | ε
+    args() {
+        const list = [];
+        if (this.current.valor === ")") return list; // Lista vacía
+        
+        list.push(this.expr());
+        
+        // ArgListTail -> , Expr ArgListTail | ε
+        while (this.current.valor === ",") {
+            this.match(TIPOS.DELIMITADOR, ",");
+            list.push(this.expr());
+        }
+        
+        return list;
+    }
+    
+    // AccessExprTail -> . ID AccessExprTail | [ Expr ] AccessExprTail | ε
+    accessExprTail(node) {
+        let currentNode = node;
+        while (this.current.valor === "." || this.current.valor === "[") {
+            if (this.current.valor === ".") {
+                // Acceso a miembro (Field Access)
+                this.match(TIPOS.DELIMITADOR, ".");
+                const member = this.current.valor;
+                this.match(TIPOS.ID);
+                currentNode = new ASTNode("MemberAccess", member, [currentNode]);
+            } else if (this.current.valor === "[") {
+                // Acceso a arreglo (Array Access)
+                this.match(TIPOS.DELIMITADOR, "[");
+                const index = this.expr();
+                this.match(TIPOS.DELIMITADOR, "]");
+                currentNode = new ASTNode("ArrayAccess", null, [currentNode, index]);
+            }
+        }
+        return currentNode;
     }
 }

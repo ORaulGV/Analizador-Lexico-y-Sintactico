@@ -79,14 +79,17 @@ a{
     color: inherit;
 }
 
+
 .content-wrapper {
-    display: flex;
-    flex-grow: 1;
+    display: grid;
+    grid-template-columns: 3fr 1fr;
     gap: 30px;
+    flex-grow: 1; 
 }
 
+
 .code-section, .tokens-section {
-    flex: 1;
+
     display: flex;
     flex-direction: column;
     background-color: white;
@@ -94,10 +97,20 @@ a{
     padding: 20px;
     box-shadow: var(--sombra);
     border: 2px solid var(--azul-primario);
-
 }
 
-.code-section h2, .tokens-section h2 {
+.ast-section {
+    grid-column: 1 / span 2;    
+    background-color: white; /* Consistencia de fondo */
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: var(--sombra);
+    border: 2px solid var(--azul-primario);
+    height: 100%;
+}
+
+.code-section h2, .tokens-section h2, .ast-section h2 {
+    /* Estilo h2 unificado */
     text-align: left;
     margin-bottom: 20px;
     color: var(--azul-primario);
@@ -105,6 +118,8 @@ a{
     padding-bottom: 10px;
     border-bottom: 2px solid var(--azul-secundario);
 }
+
+/* --- TEXTAREA Y TABLAS --- */
 
 textarea {
     height: 350px; 
@@ -120,10 +135,31 @@ textarea {
 }
 
 .table-container {
-    height: 350px; 
+    height: 350px;
     border: 2px solid var(--azul-primario);
     border-radius: 10px;
     overflow: auto;
+}
+
+
+/* --- ESTILO ESPECÍFICO DEL AST VIEWER --- */
+
+.ast-section{
+    height: 500px;
+    padding-top: 10px;
+    margin-bottom: 1rem;
+}
+#ast-results {
+    height: 350px;
+    overflow: visible;
+}
+#ast-viewer {
+    white-space: pre;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px;
+    padding: 10px;
+    line-height: 1.4;
+    color: #333;
 }
 
 table {
@@ -159,6 +195,7 @@ tr:hover {
     background-color: #e8f5ff;
 }
 
+/* --- ESTILO DE BOTONES Y FILTROS --- */
 
 .button-row,
 .button-actions {
@@ -172,7 +209,8 @@ tr:hover {
 }
 
 .button-row button,
-.button-actions button {
+.button-actions button,
+.filtro-tokens button {
     background-color: var(--azul-secundario);
     color: white;
     border: none;
@@ -212,25 +250,17 @@ button:active {
     font-size: 14px;
 }
 
-.filtro-tokens button{
-    background-color: var(--azul-secundario);
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family: "Times New Roman", Times, serif;
-    font-size: 16px;
-    transition: all 0.2s ease-in-out;
-}
-
-
 #mensaje-estado {
     margin-top: 10px;
     box-sizing: border-box;
     text-align: left;
 }
 
+
+
+/* ---------------------------------------------------------------------- */
+/* --- MEDIA QUERIES (Adaptabilidad) --- */
+/* ---------------------------------------------------------------------- */
 
 @media (max-width: 1300px) {
     .main-container {
@@ -243,9 +273,13 @@ button:active {
         margin-bottom: 30px;
     }
     
+    /* CLAVE ADAPTACIÓN: En móvil, volvemos a una sola columna para apilar todo */
     .content-wrapper {
-        flex-direction: column;
+        grid-template-columns: 1fr; 
+        /* Todas las secciones se apilan verticalmente */
     }
+    
+    /* El .ast-section y las otras secciones vuelven al comportamiento normal de bloque */
     
     .side-menu ul {
         display: flex;
